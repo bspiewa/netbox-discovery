@@ -1,0 +1,16 @@
+{
+  "http_method": "GET",
+  "results": {
+    "model_name": "FortiGate",
+    "model_number": "70G",
+    "model": "FGT70G",
+    "hostname": "fw-example"
+  },
+  "vdom": "root",
+  "path": "system",
+  "name": "status",
+  "status": "success",
+  "serial": "FGT70GTK00000001",
+  "version": "v7.6.4",
+  "build": 3596
+}

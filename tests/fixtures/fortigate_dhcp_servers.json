@@ -1,0 +1,8 @@
+{
+  "status": "success",
+  "results": [
+    {"id": 1, "interface": "internal", "default-gateway": "192.0.2.1", "netmask": "255.255.255.0",
+     "ip-range": [{"id": 1, "start-ip": "192.0.2.50", "end-ip": "192.0.2.200"}],
+     "reserved-address": [{"id": 1, "ip": "192.0.2.60", "mac": "aa:bb:cc:00:00:60"}]}
+  ]
+}

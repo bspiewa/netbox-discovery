@@ -1,0 +1,38 @@
+# netbox-discovery configuration - copy to config/config.yaml and adjust.
+# Do NOT put API tokens here: use .env / environment variables
+# (NBD_NETBOX__TOKEN, NBD_FORTIGATE__TOKEN). Any key below can also be
+# overridden from the environment, e.g. NBD_NETBOX__URL.
+
+netbox:
+  url: "https://netbox.example.com"
+  # true | false | path to a CA bundle (PEM), e.g. /etc/ssl/certs/internal-ca.pem
+  verify: true
+  timeout: 30
+
+discovery:
+  networks:
+    - "192.0.2.0/24"
+  nmap_timeout: 600
+
+fortigate:
+  enabled: true
+  url: "https://198.51.100.1:4443"
+  verify: true
+  vdom: "root"
+  timeout: 20
+
+sync:
+  tag: "netbox-discovery"        # attached to every object created by this tool
+  ip_status: "active"
+  ip_description: "Discovered by nmap"
+
+fortigate_device:
+  site_slug: "main-office"
+  create_device: true
+  role_name: "Firewall"
+  role_slug: "firewall"
+  role_color: "607d8b"
+  manufacturer_slug: "fortinet"
+  # Optional overrides - by default derived from the FortiGate model (e.g. "FortiGate 70G")
+  # device_type_model: "FortiGate 70G"
+  # device_type_slug: "fortigate-70g"

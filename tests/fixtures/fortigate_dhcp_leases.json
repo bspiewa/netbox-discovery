@@ -1,0 +1,8 @@
+{
+  "status": "success",
+  "results": [
+    {"ip": "192.0.2.50", "mac": "AA:BB:CC:00:00:01", "hostname": "laptop-1", "interface": "internal",
+     "status": "leased", "reserved": false, "vci": "MSFT 5.0", "expire_time": 1800000000, "server_mkey": 1},
+    {"ip": "192.0.2.51", "mac": null, "interface": "internal", "status": "leased", "server_mkey": 1}
+  ]
+}
