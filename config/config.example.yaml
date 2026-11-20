@@ -36,3 +36,23 @@ fortigate_device:
   # Optional overrides - by default derived from the FortiGate model (e.g. "FortiGate 70G")
   # device_type_model: "FortiGate 70G"
   # device_type_slug: "fortigate-70g"
+
+# `netbox-discovery fortigate-network`: interfaces, VLANs, prefixes, IPs and DHCP data.
+# Existing NetBox objects are never overwritten - only empty fields are filled in.
+fortigate_network:
+  sync_platform: true            # "FortiOS" platform on the device
+  sync_interfaces: true          # interfaces, LAG members, VLAN parents, MAC addresses
+  sync_vlans: true               # VLANs (from FortiGate VLAN interfaces) in a site VLAN group
+  sync_prefixes: true            # prefixes of interface subnets
+  sync_interface_ips: true       # interface IPs (+ device primary IPv4)
+  sync_dhcp_ranges: true         # DHCP pools as IP ranges
+  sync_dhcp_reservations: true   # DHCP reservations as IPs with status "reserved"
+  dhcp_lease_interfaces: []      # opt-in: leases as IPs with status "dhcp", e.g. ["VLAN101"]
+  exclude_interfaces:            # regexes; FortiOS internal interfaces by default
+    - '^(naf|l2t|ssl)\.'
+    - '^wqt'
+  physical_interface_type: "1000base-t"
+  interface_type_overrides: {}   # e.g. {wan1: "10gbase-x-sfpp"}
+  # vlan_group_slug: "main-office-vlans"   # default: "<site slug>-vlans"
+  # management_interface: "VLAN100"       # default: interface holding the fortigate.url IP
+  firmware_custom_field: "firmware_version"  # used only if this custom field exists on dcim.device

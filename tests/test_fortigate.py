@@ -73,10 +73,15 @@ def test_get_dhcp() -> None:
         f"{BASE}/api/v2/cmdb/system.dhcp/server", json=load_json("fortigate_dhcp_servers.json")
     )
     responses.get(f"{BASE}/api/v2/cmdb/system/interface", json={"results": [{"name": "wan1"}]})
+    responses.get(
+        f"{BASE}/api/v2/monitor/system/interface",
+        json={"results": {"wan1": {"mac": "00:11:22:33:44:01", "link": True}}},
+    )
     fg = FortiGateClient(BASE, "tok")
     assert len(fg.get_dhcp_leases()) == 2
     assert len(fg.get_dhcp_servers()) == 1
-    assert fg.get_interfaces() == [{"name": "wan1"}]
+    assert [i.name for i in fg.get_interfaces()] == ["wan1"]
+    assert fg.get_interface_status()["wan1"].mac == "00:11:22:33:44:01"
 
 
 @responses.activate

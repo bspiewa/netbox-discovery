@@ -1,0 +1,32 @@
+{
+ "status": "success",
+ "results": [
+  {
+   "ip": "192.0.2.151",
+   "mac": "aa:bb:cc:00:00:51",
+   "hostname": "Laptop 1",
+   "interface": "VLAN101",
+   "status": "leased",
+   "reserved": false,
+   "vci": "MSFT 5.0",
+   "expire_time": 1800000000,
+   "server_mkey": 1
+  },
+  {
+   "ip": "192.0.2.140",
+   "mac": "aa:bb:cc:00:00:40",
+   "interface": "VLAN101",
+   "status": "leased",
+   "reserved": true,
+   "server_mkey": 1
+  },
+  {
+   "ip": "192.0.2.5",
+   "mac": "aa:bb:cc:00:00:05",
+   "interface": "VLAN100",
+   "status": "leased",
+   "reserved": false,
+   "server_mkey": 2
+  }
+ ]
+}

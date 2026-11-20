@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from ipaddress import IPv4Interface, ip_interface
 from typing import Any
 
 import requests
@@ -55,6 +56,117 @@ class DhcpServer:
     netmask: str | None
     ip_ranges: list[dict[str, Any]]
     reserved_addresses: list[dict[str, Any]]
+    enabled: bool = True
+    lease_time: int | None = None
+    dns_servers: tuple[str, ...] = ()
+    domain: str | None = None
+
+
+ZERO_MACS = {"", "00:00:00:00:00:00"}
+NO_IP = "0.0.0.0"  # noqa: S104 - FortiOS "unset address" marker, not a bind address
+
+
+@dataclass(frozen=True)
+class Interface:
+    """Interface configuration (``cmdb/system/interface``)."""
+
+    name: str
+    type: str  # physical, aggregate, vlan, tunnel, switch, hard-switch, vap-switch, loopback, ...
+    enabled: bool
+    alias: str
+    description: str
+    vdom: str
+    role: str  # lan, wan, dmz, undefined
+    mode: str  # static, dhcp, pppoe
+    mtu: int | None
+    vlan_id: int | None
+    parent: str | None  # "interface" field: VLAN parent / tunnel underlay
+    members: tuple[str, ...]  # aggregate / switch members
+    ip: IPv4Interface | None
+    secondary_ips: tuple[IPv4Interface, ...]
+    mac: str | None  # configured MAC override (usually empty)
+
+
+@dataclass(frozen=True)
+class InterfaceStatus:
+    """Runtime interface status (``monitor/system/interface``)."""
+
+    name: str
+    mac: str | None
+    link: bool
+    speed_mbps: int | None
+    duplex: str | None  # "full" / "half"
+
+
+def parse_ip_mask(value: str | None) -> IPv4Interface | None:
+    """Parse FortiOS "a.b.c.d m.m.m.m" notation; ``None`` for unset (0.0.0.0) addresses."""
+    if not value:
+        return None
+    parts = value.split()
+    if not parts or parts[0] == NO_IP:
+        return None
+    try:
+        iface = ip_interface("/".join(parts[:2]))
+    except ValueError:
+        return None
+    return iface if isinstance(iface, IPv4Interface) else None
+
+
+def _mac(value: str | None) -> str | None:
+    mac = (value or "").strip().lower()
+    return None if mac in ZERO_MACS else mac
+
+
+def parse_interfaces(data: dict[str, Any]) -> list[Interface]:
+    interfaces = []
+    for item in data.get("results", []):
+        secondary = (
+            tuple(
+                ipi
+                for sec in item.get("secondaryip", [])
+                if (ipi := parse_ip_mask(sec.get("ip"))) is not None
+            )
+            if item.get("secondary-IP") == "enable"
+            else ()
+        )
+        interfaces.append(
+            Interface(
+                name=item["name"],
+                type=item.get("type", "physical"),
+                enabled=item.get("status", "up") == "up",
+                alias=item.get("alias") or "",
+                description=item.get("description") or "",
+                vdom=item.get("vdom") or "root",
+                role=item.get("role") or "undefined",
+                mode=item.get("mode") or "static",
+                mtu=item.get("mtu") or None,
+                vlan_id=item.get("vlanid") or None,
+                parent=item.get("interface") or None,
+                members=tuple(
+                    m["interface-name"] for m in item.get("member", []) if m.get("interface-name")
+                ),
+                ip=parse_ip_mask(item.get("ip")),
+                secondary_ips=secondary,
+                mac=_mac(item.get("macaddr")),
+            )
+        )
+    return interfaces
+
+
+def parse_interface_status(data: dict[str, Any]) -> dict[str, InterfaceStatus]:
+    results = data.get("results") or {}
+    statuses = {}
+    for name, item in results.items():
+        speed = item.get("speed")
+        duplex = item.get("duplex")
+        statuses[name] = InterfaceStatus(
+            name=name,
+            mac=_mac(item.get("mac")),
+            link=bool(item.get("link")),
+            speed_mbps=int(speed) if speed else None,
+            duplex={1: "full", 0: "half"}.get(duplex) if isinstance(duplex, int) else None,
+        )
+    return statuses
 
 
 def parse_system_status(data: dict[str, Any]) -> SystemStatus:
@@ -102,6 +214,14 @@ def parse_dhcp_servers(data: dict[str, Any]) -> list[DhcpServer]:
             netmask=s.get("netmask"),
             ip_ranges=s.get("ip-range", []),
             reserved_addresses=s.get("reserved-address", []),
+            enabled=s.get("status", "enable") == "enable",
+            lease_time=s.get("lease-time"),
+            dns_servers=tuple(
+                d
+                for k in ("dns-server1", "dns-server2", "dns-server3", "dns-server4")
+                if (d := s.get(k)) and d != NO_IP
+            ),
+            domain=s.get("domain") or None,
         )
         for s in data.get("results", [])
     ]
@@ -156,6 +276,8 @@ class FortiGateClient:
     def get_dhcp_servers(self) -> list[DhcpServer]:
         return parse_dhcp_servers(self.get("cmdb/system.dhcp/server"))
 
-    def get_interfaces(self) -> list[dict[str, Any]]:
-        results: list[dict[str, Any]] = self.get("cmdb/system/interface").get("results", [])
-        return results
+    def get_interfaces(self) -> list[Interface]:
+        return parse_interfaces(self.get("cmdb/system/interface"))
+
+    def get_interface_status(self) -> dict[str, InterfaceStatus]:
+        return parse_interface_status(self.get("monitor/system/interface"))

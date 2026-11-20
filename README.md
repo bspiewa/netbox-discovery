@@ -7,13 +7,15 @@ Small, safety-first tooling that discovers what is on your network and records i
 |---|---|---|
 | `scan` | `nmap -sn` ping scan of configured networks → creates missing **IP addresses** | only with `--apply` |
 | `fortigate-device` | reads hostname / model / serial from a **FortiGate** → creates the **device** (plus role and device type if missing) | only with `--apply` |
+| `fortigate-network` | FortiGate **interfaces** (LAG, VLAN parents, MACs, speed), **VLANs**, **prefixes**, interface **IPs** + primary IP, **platform**, **DHCP pools** (IP ranges), **reservations** and opt-in **leases** | only with `--apply` |
 | `fortigate-status` | shows FortiGate identity and DHCP servers | never |
 | `fortigate-dhcp-report` | summarizes FortiGate DHCP leases (per interface, status, data quality) | never |
 
 Design principles:
 
 - **Dry-run by default.** Nothing is written unless `--apply` is passed; the plan is always logged first.
-- **Never modifies or deletes existing objects.** Only missing objects are created.
+- **Never overwrites or deletes existing objects.** Missing objects are created; on existing
+  objects only *empty* fields may be filled in (e.g. a prefix without a VLAN, a device without a platform).
 - **Everything it creates is tagged** `netbox-discovery` (configurable), so managed objects are easy to find, review or clean up.
 - **Secrets stay out of config files and logs.** Tokens come from the environment / `.env`; serial numbers are masked in output.
 
@@ -64,7 +66,10 @@ able to intercept the connection.
 - **NetBox:** create a dedicated user/token for this tool with an expiry date and object
   permissions limited to what it needs: `view` on `dcim.site`, `dcim.manufacturer`,
   `ipam.prefix`; `view` + `add` on `ipam.ipaddress`, `dcim.device`, `dcim.devicerole`,
-  `dcim.devicetype`, `extras.tag`. No `change` / `delete` is required.
+  `dcim.devicetype`, `extras.tag`. For `fortigate-network` additionally `view` + `add` +
+  `change` on `dcim.device`, `dcim.interface`, `dcim.macaddress`, `dcim.platform`,
+  `ipam.vlangroup`, `ipam.vlan`, `ipam.prefix`, `ipam.ipaddress`, `ipam.iprange` and `add` on
+  `extras.journalentry` (`change` is used only to fill empty fields). No `delete` is required.
 - **FortiGate:** create a REST API admin with a **read-only** admin profile and restrict
   *Trusted Hosts* to the address of the machine running this tool.
 
@@ -80,7 +85,20 @@ uv run netbox-discovery fortigate-status
 uv run netbox-discovery fortigate-dhcp-report --limit 20
 uv run netbox-discovery fortigate-device        # dry-run plan
 uv run netbox-discovery fortigate-device --apply
+uv run netbox-discovery fortigate-network       # needs the device in NetBox (fortigate-device)
+uv run netbox-discovery -v fortigate-network    # dry-run incl. every planned payload
+uv run netbox-discovery fortigate-network --apply
 ```
+
+`fortigate-network` notes:
+
+- FortiOS internal interfaces (`naf.root`, `l2t.root`, `ssl.root`, `wqt*`) are skipped by default
+  (`fortigate_network.exclude_interfaces`).
+- VLANs go to a VLAN group scoped to the device's site (`<site>-vlans`); a VLAN ID used by two
+  FortiGate interfaces is created once and reported as `skipped_duplicate`.
+- The interface holding the `fortigate.url` address becomes the device primary IPv4 (if empty).
+- To record the FortiOS version, create a text custom field `firmware_version` on `dcim.device`;
+  version changes are then also logged as journal entries on the device.
 
 Exit codes: `0` success, `1` runtime error (e.g. some hosts failed), `2` configuration error.
 
@@ -127,6 +145,7 @@ src/netbox_discovery/
   sources/fortigate.py read-only FortiOS REST client + parsers
   sync/ip_sync.py      scan -> IP addresses
   sync/fortigate_device.py  FortiGate -> device (discover / plan / apply)
+  sync/fortigate_network.py FortiGate -> interfaces, VLANs, prefixes, IPs, DHCP
   cli.py               command line entry point
 tests/                 pytest, fixtures use RFC 5737 documentation addresses
 ```
@@ -135,9 +154,9 @@ Dependencies are managed with uv only: `uv add <pkg>` / `uv add --dev <pkg>`; co
 
 ## Roadmap
 
-- FortiGate DHCP leases → IP addresses with status `dhcp` (reservations as `reserved`),
-  following the [NetBox Labs MS-DHCP integration](https://netboxlabs.com/docs/integrations/ms-dhcp/) model
-- FortiGate interfaces and interface IPs, VLANs from DHCP server scopes
+- FortiGate VDOMs as virtual device contexts, HA peer, SFP transceivers as modules
+- Managed FortiSwitch / FortiAP devices, SSIDs as wireless LANs, LLDP → cables
+- IPsec tunnels and IKE/IPsec proposals/policies (NetBox VPN module), VIPs with NAT relations
 - Reporting/cleanup of stale objects carrying the `netbox-discovery` tag
 - Evaluate [NetBox Discovery (orb-agent + Diode)](https://netboxlabs.com/docs/discovery/) as a replacement for the nmap part
 
