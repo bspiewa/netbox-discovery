@@ -6,13 +6,17 @@ from unittest.mock import MagicMock
 import pytest
 
 from netbox_discovery import cli
+from netbox_discovery.config import load_settings
 from netbox_discovery.sources.fortigate import (
     parse_dhcp_leases,
     parse_dhcp_servers,
+    parse_interface_status,
+    parse_interfaces,
     parse_system_status,
 )
 from netbox_discovery.sources.nmap import Host
 from tests.conftest import load_json, record
+from tests.fake_netbox import FakeNetBox
 
 
 @pytest.fixture
@@ -98,3 +102,36 @@ def test_fortigate_reports(
 def test_fortigate_disabled(config_file: Path, env: None) -> None:
     config_file.write_text(config_file.read_text().replace("enabled: true", "enabled: false"))
     assert run(config_file, "fortigate-status") == cli.EXIT_CONFIG
+
+
+def _fake_fg_network(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    fg = _fake_fg(monkeypatch)
+    fg.get_interfaces.return_value = parse_interfaces(load_json("fortigate_interfaces.json"))
+    fg.get_interface_status.return_value = parse_interface_status(
+        load_json("fortigate_interface_status.json")
+    )
+    return fg
+
+
+def test_fortigate_network_requires_device(
+    config_file: Path, env: None, nb: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fake_fg_network(monkeypatch)
+    monkeypatch.setattr(cli, "build_api", lambda s: nb)
+    assert run(config_file, "fortigate-network") == cli.EXIT_ERROR
+
+
+def test_fortigate_network_dry_run(
+    config_file: Path, env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = FakeNetBox()
+    site = fake.dcim.sites.add(name="Main", slug="main-office")
+    fake.dcim.devices.add(name="fw-example", serial="FGT70GTK00000001", site=site)
+    _fake_fg_network(monkeypatch)
+    monkeypatch.setattr(cli, "build_api", lambda s: fake)
+    assert run(config_file, "fortigate-network") == cli.EXIT_OK
+    assert fake.total_created() == 0
+
+
+def test_management_ip(config_file: Path) -> None:
+    assert cli._management_ip(load_settings(config_file, env_file=None)) == "198.51.100.1"

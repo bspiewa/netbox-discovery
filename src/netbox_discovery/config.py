@@ -90,6 +90,34 @@ class FortiGateDeviceSettings(_Section):
     device_type_slug: str | None = None
 
 
+class FortiGateNetworkSettings(_Section):
+    """FortiGate interfaces / VLANs / prefixes / IPs / DHCP -> NetBox (``fortigate-network``)."""
+
+    sync_platform: bool = True
+    sync_interfaces: bool = True
+    sync_vlans: bool = True
+    sync_prefixes: bool = True
+    sync_interface_ips: bool = True
+    sync_dhcp_ranges: bool = True
+    sync_dhcp_reservations: bool = True
+    # Opt-in: DHCP leases become IPs with status "dhcp" only for these FortiGate interfaces.
+    dhcp_lease_interfaces: list[str] = Field(default_factory=list)
+
+    platform_name: str = "FortiOS"
+    platform_slug: str = "fortios"
+    # Regexes of FortiGate interface names to ignore (internal/system interfaces by default).
+    exclude_interfaces: list[str] = Field(default_factory=lambda: [r"^(naf|l2t|ssl)\.", r"^wqt"])
+    # NetBox interface type for FortiGate "physical" ports, with per-name overrides.
+    physical_interface_type: str = "1000base-t"
+    interface_type_overrides: dict[str, str] = Field(default_factory=dict)
+    # VLAN group (scoped to the site); default slug: "<site_slug>-vlans".
+    vlan_group_slug: str | None = None
+    # Interface whose IP becomes the device primary IPv4; default: the one holding fortigate.url.
+    management_interface: str | None = None
+    # NetBox custom field (dcim.device, text) for the FortiOS version - used only if it exists.
+    firmware_custom_field: str = "firmware_version"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="NBD_",
@@ -102,6 +130,7 @@ class Settings(BaseSettings):
     discovery: DiscoverySettings = Field(default_factory=DiscoverySettings)
     sync: SyncSettings = Field(default_factory=SyncSettings)
     fortigate_device: FortiGateDeviceSettings = Field(default_factory=FortiGateDeviceSettings)
+    fortigate_network: FortiGateNetworkSettings = Field(default_factory=FortiGateNetworkSettings)
 
     @classmethod
     def settings_customise_sources(

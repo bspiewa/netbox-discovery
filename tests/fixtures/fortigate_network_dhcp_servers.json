@@ -1,0 +1,59 @@
+{
+ "status": "success",
+ "results": [
+  {
+   "id": 1,
+   "status": "enable",
+   "interface": "VLAN101",
+   "default-gateway": "192.0.2.129",
+   "netmask": "255.255.255.128",
+   "lease-time": 604800,
+   "dns-server1": "192.0.2.53",
+   "dns-server2": "0.0.0.0",
+   "domain": "example.com",
+   "ip-range": [
+    {
+     "id": 1,
+     "start-ip": "192.0.2.150",
+     "end-ip": "192.0.2.200"
+    }
+   ],
+   "reserved-address": [
+    {
+     "id": 1,
+     "ip": "192.0.2.140",
+     "mac": "AA:BB:CC:00:00:40",
+     "description": "printer"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "status": "disable",
+   "interface": "VLAN100",
+   "netmask": "255.255.255.128",
+   "ip-range": [
+    {
+     "id": 1,
+     "start-ip": "192.0.2.10",
+     "end-ip": "192.0.2.20"
+    }
+   ],
+   "reserved-address": []
+  },
+  {
+   "id": 3,
+   "status": "enable",
+   "interface": "ssl.root",
+   "netmask": "255.255.255.0",
+   "ip-range": [
+    {
+     "id": 1,
+     "start-ip": "203.0.113.100",
+     "end-ip": "203.0.113.110"
+    }
+   ],
+   "reserved-address": []
+  }
+ ]
+}

@@ -11,6 +11,8 @@ import sys
 from collections import Counter
 from collections.abc import Sequence
 from functools import partial
+from ipaddress import ip_address
+from urllib.parse import urlparse
 
 from netbox_discovery import __version__
 from netbox_discovery.config import ConfigError, Settings, load_settings, require_token
@@ -19,7 +21,7 @@ from netbox_discovery.logsetup import mask, setup_logging
 from netbox_discovery.netbox_client import build_api
 from netbox_discovery.sources.fortigate import FortiGateClient
 from netbox_discovery.sources.nmap import scan_network
-from netbox_discovery.sync import fortigate_device
+from netbox_discovery.sync import fortigate_device, fortigate_network
 from netbox_discovery.sync.ip_sync import sync_networks
 
 log = logging.getLogger("netbox_discovery")
@@ -74,6 +76,48 @@ def cmd_fortigate_device(settings: Settings, args: argparse.Namespace) -> int:
     if device is not None:
         log.info("Device created: %s (ID %s)", device.name, device.id)
     return EXIT_OK
+
+
+def _management_ip(settings: Settings) -> str | None:
+    host = urlparse(str(settings.fortigate.url)).hostname if settings.fortigate.url else None
+    try:
+        return str(ip_address(host)) if host else None
+    except ValueError:
+        return None
+
+
+def cmd_fortigate_network(settings: Settings, args: argparse.Namespace) -> int:
+    net_cfg = settings.fortigate_network
+    fg = _fortigate(settings)
+    nb = build_api(settings.netbox)
+    data = fortigate_network.discover(fg, with_leases=bool(net_cfg.dhcp_lease_interfaces))
+    if not data.status.serial:
+        raise ConfigError("FortiGate did not report a serial number")
+    devices = list(nb.dcim.devices.filter(serial=data.status.serial))
+    if len(devices) != 1:
+        log.error(
+            "Expected exactly one NetBox device with the FortiGate serial, found %d - "
+            "run 'netbox-discovery fortigate-device --apply' first",
+            len(devices),
+        )
+        return EXIT_ERROR
+    device = devices[0]
+    site_id = getattr(device.site, "id", device.site)
+    site = nb.dcim.sites.get(site_id)
+    log.info("Device: %s (ID %s), site: %s", device.name, device.id, site.name)
+    report = fortigate_network.NetworkSync(
+        nb,
+        data,
+        device,
+        site,
+        net_cfg,
+        tag=settings.sync.tag,
+        dry_run=not args.apply,
+        management_ip=_management_ip(settings),
+    ).run()
+    if not args.apply:
+        log.info("DRY-RUN: nothing was written. Re-run with --apply to apply the changes.")
+    return EXIT_OK if report.ok else EXIT_ERROR
 
 
 def cmd_fortigate_status(settings: Settings, args: argparse.Namespace) -> int:
@@ -132,6 +176,13 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("fortigate-device", help="create the FortiGate device in NetBox")
     p.add_argument("--apply", action="store_true", help="write to NetBox (default: dry-run)")
     p.set_defaults(func=cmd_fortigate_device)
+
+    p = sub.add_parser(
+        "fortigate-network",
+        help="FortiGate interfaces, VLANs, prefixes, IPs and DHCP data -> NetBox",
+    )
+    p.add_argument("--apply", action="store_true", help="write to NetBox (default: dry-run)")
+    p.set_defaults(func=cmd_fortigate_network)
 
     p = sub.add_parser(
         "fortigate-status", help="show FortiGate status and DHCP servers (read-only)"

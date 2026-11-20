@@ -1,0 +1,45 @@
+{
+ "status": "success",
+ "results": {
+  "wan1": {
+   "id": "wan1",
+   "name": "wan1",
+   "mac": "00:11:22:33:44:01",
+   "link": true,
+   "speed": 1000.0,
+   "duplex": 1
+  },
+  "port1": {
+   "id": "port1",
+   "name": "port1",
+   "mac": "00:11:22:33:44:02",
+   "link": true,
+   "speed": 1000.0,
+   "duplex": 1
+  },
+  "port2": {
+   "id": "port2",
+   "name": "port2",
+   "mac": "00:11:22:33:44:03",
+   "link": true,
+   "speed": 1000.0,
+   "duplex": 1
+  },
+  "fsw": {
+   "id": "fsw",
+   "name": "fsw",
+   "mac": "00:11:22:33:44:02",
+   "link": true,
+   "speed": 2000.0,
+   "duplex": 1
+  },
+  "ssidtest": {
+   "id": "ssidtest",
+   "name": "ssidtest",
+   "mac": "00:00:00:00:00:00",
+   "link": false,
+   "speed": 0,
+   "duplex": 0
+  }
+ }
+}
